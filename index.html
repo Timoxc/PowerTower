@@ -1,0 +1,1956 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tower Deck â€” 9Ã—9 (Multi-tile + Gym)</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#101821; --panel2:#0d141c; --grid:#162330; --text:#e6eef8; --muted:#a9b4c0; --acc:#7dd3fc; --money:#34d399; --danger:#ef4444; --warn:#f59e0b;
+    --tile:#0f1722; --tile2:#0c1218; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 900px at 20% 10%, #142131, #0b0f14 55%, #090c12 100%),
+      linear-gradient(180deg, #0b0f14, #0b0f14);
+    color:var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", Arial;
+    display:grid;
+    grid-template-rows: auto 1fr auto;
+  }
+  .top{display:grid; grid-template-columns: 1fr auto 1fr; align-items:center; gap:14px; padding:12px 16px; background:linear-gradient(180deg,#121a26,#0c1219); border-bottom:1px solid #1a2430}
+  .brand{display:flex; gap:10px; align-items:center; font-weight:800}
+  .brand .logo{font-size:22px}
+  .stats{display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap}
+  .pill{background:#0e1520; border:1px solid #1a2430; border-radius:12px; padding:6px 10px; min-width:110px; text-align:center; font-variant-numeric: tabular-nums}
+  .pill b{letter-spacing:.4px}
+
+  .wrap{display:grid; grid-template-columns: 1fr; gap:16px; padding:16px;}
+  .scene{display:none}
+  .scene.active{display:block}
+
+  .panel{background:linear-gradient(180deg,#101821,#0c1219); border:1px solid #1a2430; border-radius:var(--radius); box-shadow:0 20px 50px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05)}
+
+  /* Board */
+  .board{
+    aspect-ratio:1/1;
+    max-width:760px;
+    width:100%;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap:0;
+    padding:0;
+  }
+  .cell{
+    position:relative;
+    background:var(--tile);
+    border:1px solid #1a2430;
+    border-radius:0;
+    display:grid;
+    place-items:center;
+    min-height:0;
+    cursor:pointer;
+  }
+  .cell.empty:hover{outline:2px dashed rgba(125,211,252,.5);}
+  .cell.collecting{outline:3px solid var(--acc); outline-offset:-3px; box-shadow:0 0 0 3px rgba(125,211,252,.25) inset;}
+  .cell.util-collecting{outline:3px solid var(--warn); outline-offset:-3px; box-shadow:0 0 0 3px rgba(245,158,11,.25) inset;}
+  .cell.inactive{outline:3px solid var(--danger); outline-offset:-3px;}
+
+  /* placement ghost + tooltip */
+  .ghost{position:absolute; inset:0; border:2px dashed; border-radius:4px; pointer-events:none}
+  .ghost.valid{border-color:var(--acc); background:rgba(125,211,252,.08)}
+  .ghost.invalid{border-color:var(--danger); background:rgba(239,68,68,.08)}
+  .ghost-tip{position:absolute; left:4px; right:4px; bottom:4px; font-size:11px; color:var(--muted); background:rgba(0,0,0,.35); border:1px solid #223041; border-radius:6px; padding:2px 6px; pointer-events:none}
+
+  /* joined edges for multi-tile rooms */
+  .cell.joined-left{border-left:none;}
+  .cell.joined-right{border-right:none;}
+  .cell.joined-top{border-top:none;}
+  .cell.joined-bottom{border-bottom:none;}
+
+  .tile{
+    width:100%;
+    height:100%;
+    display:grid;
+    place-items:center;
+    background:#18273a;
+    text-align:center;
+    font-size:15px;
+    font-weight:700;
+  }
+  .tile.room{background:#18273a;}
+  .tile.conn{background:#142435;}
+  .tile.lobby{background:#153b2f;}
+  .tile .label{font-size:11px; color:var(--muted); font-weight:700}
+
+  .dock{position:sticky; bottom:0; background:linear-gradient(180deg,#101821,#0c1219); border:1px solid #1a2430; border-radius:var(--radius); box-shadow:0 -10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05); padding:8px 12px}
+  .dock-grid{display:grid; grid-template-columns: 1.4fr 1fr 1fr; gap:12px; align-items:start}
+  @media (max-width: 900px){ .dock-grid{ grid-template-columns: 1fr; } }
+  .dock-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px}
+  .muted{color:var(--muted); font-size:12px}
+  .hand{display:flex; gap:8px; flex-wrap:wrap}
+  .card{flex: 1 1 120px; min-width:120px; background:linear-gradient(180deg,#142233,#0f1826); border:1px solid #223041; border-radius:12px; padding:8px; cursor:pointer; box-shadow:0 8px 18px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05)}
+  .card h4{margin:0 0 4px 0; font-size:14px}
+  .card p{margin:0; font-size:11px; color:var(--muted)}
+  .card .meta{margin-top:6px; display:flex; justify-content:space-between; font-size:11px; color:var(--muted)}
+  .card.selected{outline:2px solid var(--acc)}
+
+  .invoice{height:420px; overflow-y:auto; text-align:left; background:var(--panel2); padding:10px; border-radius:8px; border:1px solid #1a2430; font-size:13px; margin-top:10px}
+  .invoice-entry{margin-bottom:4px; font-size:13px; line-height:1.2}
+  .invoice-entry .name{font-weight:700; font-size:13px}
+  .invoice-entry .amount{float:right; font-size:13px}
+  .invoice-entry.utility{color:var(--warn)}
+  .invoice-total{margin-top:8px; padding-top:8px; border-top:1px solid #223041; font-weight:800; font-size:13px}
+
+  .shop-grid{display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;}
+  .shop-card{background:linear-gradient(180deg,#142233,#0f1826); border:1px solid #223041; border-radius:12px; padding:8px; box-shadow:0 8px 18px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05)}
+  .shop-card.sold{opacity:.45; filter:grayscale(.6); pointer-events:none; position:relative}
+  .shop-card .sold-badge{position:absolute; top:6px; right:6px; font-size:10px; background:#243447; border:1px solid #2e4156; padding:2px 6px; border-radius:8px; color:var(--muted)}
+
+    .calendar-grid{display:grid; grid-template-columns: repeat(7, 1fr); gap:6px; margin-top:10px}
+  .calendar-header{display:grid; grid-template-columns: repeat(7, 1fr); gap:6px; margin-top:10px}
+  .calendar-head{padding:6px; text-align:center; color:var(--muted); font-weight:700; font-size:12px}
+  .calendar-cell{padding:6px; text-align:center; background:var(--tile2); border-radius:8px; border:1px solid #1a2430; font-size:12px; position:relative; aspect-ratio:1/1; display:flex; flex-direction:column; justify-content:center; align-items:center; overflow:hidden}ââŠ
+  .calendar-cell.today{outline:2px solid var(--acc);}
+  .calendar-mutation{position:absolute; bottom:4px; left:0; right:0; font-size:10px; color:var(--warn)}
+
+  .footer{padding:10px 16px; font-size:12px; color:var(--muted)}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand"><div class="logo">ðŸ¢</div> <div>Tower Deck</div></div>
+    <div class="stats">
+      <div class="pill">ðŸ’° $<b id="money">0</b></div>
+      <div class="pill">ðŸ“… Day <b id="day">0</b></div>
+      <div class="pill">ðŸ—ï¸ Floor <b id="floors">0</b></div>
+      <div class="pill">ðŸ§‘â€ðŸ¤â€ðŸ§‘ <b id="employeesCount">0</b>/4</div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- Start scene -->
+        <div id="scene-start" class="scene active">
+      <div class="panel" style="max-width:640px; margin:40px auto; padding:20px; text-align:center">
+        <h1 style="margin-top:6px">Tower Deck</h1>
+        <p>Build a towering complex, manage your deck, and survive the month.</p>
+        <div style="margin:12px 0; text-align:left; background:var(--panel2); border:1px solid #1a2430; padding:10px; border-radius:8px;">
+          <h3 style="margin:0 0 8px 0;">Mode</h3>
+          <label style="display:inline-flex; align-items:center; gap:6px; margin-right:12px;">
+            <input type="radio" name="mode" value="classic" checked>
+            <span>Classic</span>
+          </label>
+          <label style="display:inline-flex; align-items:center; gap:6px;">
+            <input type="radio" name="mode" value="madking">
+            <span>The Mad King's Tower</span>
+          </label>
+          <div class="muted" style="margin-top:6px; font-size:12px;">
+            The Mad King issues weekly objectives on days 1, 8, 15, and 22.
+          </div>
+        </div>
+        <button id="startBtn">New Game</button>
+      </div>
+    </div>
+
+    <!-- Today's Tasks scene -->
+        <div id="scene-tasks" class="scene">
+      <div class="panel" style="padding:12px; max-width:520px; margin:0 auto;">
+        <h2>Today's Tasks</h2>
+        <div id="tasksList" class="invoice" style="height:auto; max-height:360px;">
+          <div id="tasksBills" class="invoice-entry"><span class="name">Today's Bills</span> <span class="amount">$0</span></div>
+          <div id="tasksMutations" class="invoice-entry"><span class="name">Mutation(s)</span> <span class="amount">None</span></div>
+          <div id="tasksMutList"></div>
+          <div class="invoice-entry" id="tasksModsHeader" style="display:none;"><span class="name">Mad King's Modifiers</span></div>
+          <div id="tasksObjectiveList"></div>
+        </div>
+        <div style="margin-top:12px"><button id="tasksContinueBtn">Continue</button></div>
+      </div>
+    </div>
+
+    <!-- Build scene -->
+    <div id="scene-build" class="scene">
+      <div class="panel" style="padding:12px">
+        <div class="build-grid" style="display:grid; grid-template-columns: 1fr 320px; gap:12px; align-items:start;">
+          <div class="board" id="board"></div>
+          <div>
+            <h3 style="margin:0 0 6px 0;">Invoice</h3>
+             <div id="invoice" class="invoice"></div>
+            <div id="invoiceSubtotal" class="pill" style="margin-top:8px; width:100%; text-align:left;">Subtotal: $0</div>
+            <div id="invoiceMadReward" class="pill" style="margin-top:8px; width:100%; text-align:left;">Mad King's Reward: $0</div>
+            <div id="invoiceSubtotalAfter" class="pill" style="margin-top:8px; width:100%; text-align:left;">Subtotal (After Reward): $0</div>
+            <div id="invoiceBills" class="pill" style="margin-top:8px; width:100%; text-align:left;">Today's Bills: $0</div
+            <div id="invoiceGrandTotal" class="pill" style="margin-top:8px; width:100%; text-align:left;">Total: $0</div>
+            <div style="margin-top:8px; display:flex; gap:8px; justify-content:flex-start;">
+              <button id="endDayBtn">End Day</button>
+              <button id="confirmInvoiceBtn" disabled>Continue</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dock">
+        <div class="dock-grid">
+          <div>
+            <div class="dock-header"><strong>Hand</strong><span class="muted">Click to place</span></div>
+            <div id="hand" class="hand"></div>
+          </div>
+          <div>
+            <div class="dock-header"><strong>Day</strong><span class="muted">Tools</span></div>
+            <button id="calendarBtn">ðŸ“† Calendar</button>
+          </div>
+          <div>
+            <div class="dock-header"><strong>Employees</strong><span class="muted">Hired staff</span></div>
+            <div id="employees" class="hand"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shop scene -->
+    <div id="scene-shop" class="scene">
+      <div class="panel" style="padding:12px">
+        <h2>Shop</h2>
+        <div class="shop-grid" id="shop"></div>
+        <div style="margin-top:12px; display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+          <button id="burnBtn">ðŸ”¥ Burn from Discard</button>
+          <div style="flex:1"></div>
+          <button id="rerollBtn">Reroll Cards ($<span id="rerollCost"></span>)</button>
+          <button id="nextDayBtn">Start Next Day</button>
+        </div>
+        <div id="burnRow" class="hand" style="margin-top:8px; display:none;"></div>
+      </div>
+    </div>
+
+    <!-- Daily summary -->
+    <div id="scene-daily" class="scene">
+      <div class="panel" style="padding:12px; max-width:520px; margin:0 auto;">
+        <h2>Daily Summary</h2>
+        <div id="dailySummary" class="invoice" style="height:auto; max-height:360px;"></div>
+        <div style="margin-top:12px"><button id="dailyContinueBtn">Continue</button></div>
+      </div>
+    </div>
+
+    <!-- Hire scene -->
+    <div id="scene-hire" class="scene">
+      <div class="panel" style="padding:12px">
+        <h2>Hire Employees</h2>
+        <p class="muted">Pick one to hire (max <span id="hireMax"></span>). Click an existing employee to replace.</p>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+          <div>
+            <h3>Current Team</h3>
+            <div id="hireCurrent" class="hand"></div>
+          </div>
+          <div>
+            <h3>Candidates</h3>
+            <div id="hireOffers" class="hand"></div>
+            <div style="margin-top:10px; display:flex; gap:8px; justify-content:flex-end;">
+              <button id="hireSkipBtn">Skip</button>
+              <button id="hireConfirmBtn" disabled>Hire Selected</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Calendar scene -->
+    <div id="scene-calendar" class="scene">
+      <div class="panel" style="padding:12px">
+        <h2>Calendar</h2>
+        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px;">
+          <div>
+            <div class="calendar-header">
+              <div class="calendar-head">Mon</div>
+              <div class="calendar-head">Tue</div>
+              <div class="calendar-head">Wed</div>
+              <div class="calendar-head">Thu</div>
+              <div class="calendar-head">Fri</div>
+              <div class="calendar-head">Sat</div>
+              <div class="calendar-head">Sun</div>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+          </div>
+          <div id="calendarInfo" style="background:var(--panel2); border:1px solid #1a2430; border-radius:8px; padding:10px;">
+            <h3 style="margin-top:0">Today</h3>
+            <div id="calendarInfoBills" class="invoice-entry"><span class="name">Today's Bills</span> <span class="amount">$0</span></div>
+            <div id="calendarInfoMutation" class="invoice-entry"><span class="name">Mutation</span> <span class="amount">None</span></div>
+            <div class="invoice-entry" id="calendarInfoModsHeader"><span class="name">Mad King's Modifiers</span></div>
+            <div id="calendarInfoModsList"></div>
+            <div style="margin-top:10px; display:flex; gap:8px;">
+              <button id="closeCalendarBtn">Close</button>
+              <button id="calendarContinueBtn" style="display:none">Continue</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game over -->
+    <div id="scene-gameover" class="scene">
+      <div class="panel" style="padding:12px; max-width:520px; margin:0 auto;">
+        <h2>Game Over</h2>
+        <p>You ran out of money.</p>
+        <div id="gameOverSummary" class="invoice" style="height:auto;"></div>
+        <div style="margin-top:12px"><button id="restartBtn">Restart</button></div>
+      </div>
+    </div>
+
+    <!-- Win -->
+    <div id="scene-win" class="scene">
+      <div class="panel" style="padding:12px; max-width:520px; margin:0 auto;">
+        <h2>ðŸ† You Survived the Month!</h2>
+        <p>Day 28 cleared.</p>
+        <div id="winSummary" class="invoice" style="height:auto;"></div>
+        <div style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
+          <button id="endlessBtn">Continue â€” Endless Mode</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">Invoice: rooms outline blue; utilities outline orange; mutated/inactive rooms outline red.</div>
+
+<script>
+'use strict';
+
+// --- helpers ---
+function fmt(n){ return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:0, maximumFractionDigits:0}); }
+function choice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+function delay(ms){ return new Promise(res=>setTimeout(res, ms)); }
+
+// --- constants + DOM refs ---
+const W = 9; let H = 9;
+let grid = Array.from({length:H}, ()=>Array(W).fill(null));
+const boardEl = document.getElementById('board');
+const handEl = document.getElementById('hand');
+const moneyEl = document.getElementById('money');
+const dayEl = document.getElementById('day');
+const employeesEl = document.getElementById('employees');
+const shopEl = document.getElementById('shop');
+const rerollBtn = document.getElementById('rerollBtn');
+const rerollCostEl = document.getElementById('rerollCost');
+const burnRowEl = document.getElementById('burnRow');
+const invoiceEl = document.getElementById('invoice');
+const invoiceSubtotalEl = document.getElementById('invoiceSubtotal');
+const invoiceBillsEl = document.getElementById('invoiceBills');
+const invoiceGrandTotalEl = document.getElementById('invoiceGrandTotal');
+const dailySummaryEl = document.getElementById('dailySummary');
+const scenes = {
+  start: document.getElementById('scene-start'),
+  build: document.getElementById('scene-build'),
+  shop: document.getElementById('scene-shop'),
+  daily: document.getElementById('scene-daily'),
+  gameover: document.getElementById('scene-gameover'),
+  win: document.getElementById('scene-win'),
+  calendar: document.getElementById('scene-calendar'),
+  hire: document.getElementById('scene-hire'),
+  tasks: document.getElementById('scene-tasks')
+};
+
+let state = {
+  day:0,
+  money:250,
+  hand:[],
+  deck:[],
+  discard:[],
+  shop:[],
+  employees:[],
+  maxEmployees:4,
+  rerolledToday:false,
+  invoice:[],
+  rentSpeed:250,
+  scene:'start',
+  endless:false,
+  roomsPlacedToday:0,
+  priceBoost:{},
+  selectedCard:null,
+  mode:'classic',
+  madObjectives:[]
+};
+
+// --- themes helper ---
+function hasTheme(tile,theme){ return !!(tile && tile.themes && tile.themes.includes(theme)); }
+
+// --- card pool (with Gym) ---
+const cardPool = [
+  { id:'apt',  name:'Apartment',        desc:'$100 base rent', rent:100, type:'room', rarity:'basic',      themes:['accommodation'] },
+  { id:'hsui', name:'Hotel Suite',      desc:'$150 base rent', rent:150, type:'room', rarity:'uncommon',   themes:['accommodation'] },
+  { id:'lapt', name:'Luxury Apartment', desc:'$250 base rent', rent:250, type:'room', rarity:'epic',       themes:['accommodation'] },
+  { id:'pent', name:'Penthouse',        desc:'$250 rent, Ã—2 if next to elevator', rent:250, type:'room', rarity:'legendary', themes:['accommodation'] },
+  { id:'ofc',  name:'Office',           desc:'$100 base rent', rent:100, type:'room', rarity:'basic',      themes:['office'] },
+  { id:'gofc', name:'Grand Office',     desc:'$200 base rent', rent:200, type:'room', rarity:'uncommon',   themes:['office'] },
+  { id:'rest', name:'Restaurant',       desc:'$200 base rent', rent:200, type:'room', rarity:'common',     themes:['food'] },
+  { id:'food', name:'Food Court',       desc:'$300 base rent', rent:300, type:'room', rarity:'rare',       themes:['food'] },
+  { id:'kit',  name:'Kitchen',          desc:'$500 if next to Restaurant/Food Court', rent:500, type:'room', rarity:'rare', themes:['food'] },
+  { id:'shop', name:'Shop',             desc:'$120 base rent', rent:120, type:'room', rarity:'common' },
+
+  // NEW multi-tile room
+  { id:'gym',  name:'Gym',              desc:'+25% rent to adjacent Offices', rent:300, type:'room', rarity:'uncommon', size:{w:2,h:1}, themes:['facilities'] },
+
+  { id:'lob',  name:'Lobby',            desc:'Base of tower',  type:'conn', lobby:true, rarity:'basic' },
+  { id:'cor',  name:'Corridor',         desc:'Horizontal conn', type:'conn', rarity:'basic' },
+  { id:'ele',  name:'Elevator',         desc:'Vertical conn',  type:'conn', elevator:true, rarity:'uncommon' },
+  { id:'stair',name:'Stairs',           desc:'Vertical conn',  type:'conn', stairs:true, rarity:'common' },
+
+  { id:'gard', name:'Garden',           desc:'+25% to connected rooms', type:'util', mul:1.25, rarity:'common' },
+  { id:'fount',name:'Fountain',         desc:'+25% to adjacent rooms', type:'util', mul:1.25, rarity:'common', themes:['water'] },
+  { id:'pool', name:'Swimming Pool',    desc:'+25% adjacent (disabled by Water Works)', type:'util', mul:1.25, rarity:'epic', themes:['water'] },
+  { id:'pow',  name:'Power Plant',      desc:'Ã—2 to connected rooms', type:'util', mul:2, rarity:'rare', themes:['facilities'] },
+  { id:'zone', name:'Zoning Office',    desc:'+0.05 per accommodation room', type:'util', rarity:'uncommon' },
+  { id:'bulldozer', name:'Bulldozer',   desc:'Remove a room', type:'util', bulldozer:true, rarity:'rare' },
+  { id:'sec',  name:'Security Office',  desc:'Double adjacent Bank Vaults', type:'util', rarity:'uncommon' },
+  { id:'mnt',  name:'Maintenance',      desc:'Triple Antenna effect', type:'util', rarity:'rare', themes:['facilities'] },
+  { id:'work', name:'Workshop',         desc:'Adj shops +utility', type:'util', rarity:'uncommon', themes:['facilities'] },
+  { id:'vault',name:'Bank Vault',       desc:'Ã—3, doubled by Security', type:'util', rarity:'legendary' },
+  { id:'ant',  name:'Antenna',          desc:'+0.08 per floor; boosted by Maintenance', type:'util', rarity:'uncommon', themes:['facilities'] }
+];
+
+// employees (as before)
+const EMPLOYEES = [
+  { id:'fore', name:'Foreman', icon:'ðŸ‘·', text:'Higher chance of Bulldozer in shop.' },
+  { id:'rob',  name:'Bank Robber', icon:'ðŸ•µï¸', text:'Bank Vault effects applied twice.' },
+  { id:'grd',  name:'Gardener', icon:'ðŸŒ±', text:'Gardens 4Ã— as effective.' },
+  { id:'janitor', name:'Janitor', icon:'ðŸ§¹', text:'Offices +50% base rent.' },
+  { id:'handy', name:'Handyman', icon:'ðŸ› ï¸', text:'Maintenance boosts antennas 50% more.' },
+  { id:'maid', name:'Maid', icon:'ðŸ§º', text:'Hotel Suite, Luxury Apt, Penthouse +25% base.' },
+  { id:'chef', name:'Chef', icon:'ðŸ‘¨â€ðŸ³', text:'Kitchen, Restaurant, Food Court +25% base.' },
+  { id:'elec', name:'Electrician', icon:'ðŸ”Œ', text:'Power Plants +50% effectiveness.' },
+  { id:'plumb', name:'Plumber', icon:'ðŸª ', text:'Fountains & Pools Ã—2.' },
+  { id:'pshop', name:'Personal Shopper', icon:'ðŸ›ï¸', text:'Shop rerolls are free.' },
+  { id:'arch', name:'Architect', icon:'ðŸ“', text:'Remove common cards from shop.' },
+  { id:'bmgr', name:'Bank Manager', icon:'ðŸ¦', text:'Bank Vault is Uncommon.' }
+];
+function hasEmp(id){ return state.employees.some(e=>e.id===id); }
+
+// hire state
+let hireOffers=[], hireSelection=-1, replaceSelection=-1;
+
+// --- basic helpers ---
+function inBounds(x,y){ return x>=0 && x<W && y>=0 && y<H; }
+function getCell(x,y){ return [...boardEl.children].find(c=>+c.dataset.x===x && +c.dataset.y===y); }
+function neighbors(x,y){ return [[1,0],[-1,0],[0,1],[0,-1]].map(d=>[x+d[0],y+d[1]]).filter(p=>inBounds(p[0],p[1])); }
+
+// --- grid build ---
+function buildGrid(){
+  boardEl.innerHTML='';
+  boardEl.style.gridTemplateColumns = `repeat(${W}, 1fr)`;
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const cell=document.createElement('div');
+      cell.className='cell empty';
+      cell.dataset.x=x;
+      cell.dataset.y=y;
+      cell.addEventListener('click',()=>cellClicked(x,y));
+      cell.addEventListener('mouseenter',()=>cellHovered(x,y));
+      cell.addEventListener('mouseleave',clearGhost);
+      boardEl.appendChild(cell);
+    }
+  }
+}
+
+// joined rendering
+// --- placement preview & validation ---
+let ghostElems=[];
+function clearGhost(){
+  ghostElems.forEach(el=>{ try{ el.remove(); }catch(_){} });
+  ghostElems=[];
+}
+function canPlace(card,x,y){
+  if(!card) return {ok:false, reason:''};
+  // Bulldozer: valid only on an existing non-lobby tile
+  if(card.bulldozer){
+    const t = inBounds(x,y)? grid[y][x] : null;
+    if(!t) return {ok:false, reason:'No tile to remove'};
+    if(t.lobby) return {ok:false, reason:'Cannot remove the Lobby'};
+    return {ok:true, reason:'Remove tile'};
+  }
+  const size = card.size || {w:1,h:1};
+  // Bounds and occupancy
+  for(let ox=0; ox<size.w; ox++){
+    for(let oy=0; oy<size.h; oy++){
+      const tx=x+ox, ty=y+oy;
+      if(!inBounds(tx,ty)) return {ok:false, reason:'Out of bounds'};
+      if(grid[ty][tx]) return {ok:false, reason:'Space occupied'};
+    }
+  }
+  // Support along bottom edge
+  for(let ox=0; ox<size.w; ox++){
+    const tx=x+ox, ty=y+(size.h-1);
+    if(ty < H-1){
+      const below = grid[ty+1][tx];
+      if(!below) return {ok:false, reason:'Needs support below'};
+      if(card.elevator){
+        const ok = !!(below.lobby || below.elevator || below.id==='cor');
+        if(!ok) return {ok:false, reason:'Elevator must sit on Lobby/Corridor/Elevator'};
+      }
+    }
+  }
+  return {ok:true, reason:'Click to place'};
+}
+function cellHovered(x,y){
+  clearGhost();
+  const card=state.selectedCard;
+  if(!card) return;
+  const res=canPlace(card,x,y);
+  const size = card.bulldozer ? {w:1,h:1} : (card.size || {w:1,h:1});
+  // draw ghost footprint
+  for(let ox=0; ox<size.w; ox++){
+    for(let oy=0; oy<size.h; oy++){
+      const tx=x+ox, ty=y+oy;
+      if(!inBounds(tx,ty)) continue;
+      const cell=getCell(tx,ty);
+      if(!cell) continue;
+      const g=document.createElement('div');
+      g.className='ghost '+(res.ok?'valid':'invalid');
+      cell.appendChild(g);
+      ghostElems.push(g);
+    }
+  }
+  // root tooltip
+  const root=getCell(x,y);
+  if(root){
+    const tip=document.createElement('div');
+    tip.className='ghost-tip';
+    if(card.bulldozer){
+      tip.textContent = res.ok ? 'Bulldoze tile' : res.reason;
+    } else if(res.ok && card.type==='room'){
+      try{
+        const est = estimateBaseAndMul(card,x,y);
+        const total = Math.floor((est.base||0) * (est.mul||1));
+        tip.textContent = `Place ${(card.name||card.id)}: $${fmt(est.base||0)} x${(est.mul||1).toFixed(2)} = $${fmt(total)}`;
+      }catch(_){
+        tip.textContent = 'Place '+(card.name||card.id);
+      }
+    } else {
+      tip.textContent = res.ok? 'Place '+(card.name||card.id) : res.reason;
+    }
+    root.appendChild(tip);
+    ghostElems.push(tip);
+  }
+}
+
+function renderGrid(){
+  const floorsEl=document.getElementById('floors');
+  if(floorsEl) floorsEl.textContent = towerHeight();
+
+  for(const cell of boardEl.children){
+    const x=+cell.dataset.x;
+    const y=+cell.dataset.y;
+    const tile=grid[y][x];
+
+    cell.className='cell'+(tile?'':' empty');
+    cell.innerHTML='';
+
+    if(tile){
+      if(isTileInactive(tile)) cell.classList.add('inactive');
+
+      const div=document.createElement('div');
+      div.className='tile '+(tile.type||'');
+
+      const isRoot = !tile.part || (tile.part.ox===0 && tile.part.oy===0);
+      const size = tile.size || {w:1,h:1};
+
+      if(tile.lobby) div.classList.add('lobby');
+
+      if(isRoot){
+        div.innerHTML=`<div class="label">${tile.name||tile.id}</div>`;
+      } else {
+        div.style.opacity='0.5';
+      }
+
+      // join edges for multi-tile
+      if(size.w>1 || size.h>1){
+        if(tile.part){
+          if(tile.part.ox>0) cell.classList.add('joined-left');
+          if(tile.part.ox < (size.w-1)) cell.classList.add('joined-right');
+          if(tile.part.oy>0) cell.classList.add('joined-top');
+          if(tile.part.oy < (size.h-1)) cell.classList.add('joined-bottom');
+        } else {
+          // root: if width>1, join to right
+          if(size.w>1) cell.classList.add('joined-right');
+          if(size.h>1) cell.classList.add('joined-bottom');
+        }
+      }
+
+      cell.appendChild(div);
+    }
+  }
+}
+
+// show red X
+function showUnsupportedMark(x,y){
+  const cell=getCell(x,y);
+  if(cell){
+    const mark=document.createElement('div');
+    mark.textContent='X';
+    mark.style.position='absolute';
+    mark.style.color='red';
+    mark.style.fontSize='24px';
+    cell.appendChild(mark);
+    setTimeout(()=>mark.remove(),900);
+  }
+}
+
+// place tile (with multi-tile support)
+function placeTile(card,x,y){
+  if(!inBounds(x,y)) return;
+
+  const size = card.size || {w:1,h:1};
+
+  // 1) bounds & empty
+  for(let ox=0; ox<size.w; ox++){
+    for(let oy=0; oy<size.h; oy++){
+      const tx = x+ox;
+      const ty = y+oy;
+      if(!inBounds(tx,ty) || grid[ty][tx]){
+        showUnsupportedMark(x,y);
+        return;
+      }
+    }
+  }
+
+  // 2) support (bottom edge of footprint)
+  for(let ox=0; ox<size.w; ox++){
+    const tx = x+ox;
+    const ty = y+(size.h-1);
+    if(ty < H-1){
+      const below = grid[ty+1][tx];
+      if(!below){
+        showUnsupportedMark(x,y);
+        return;
+      }
+      // Elevators may only be placed on lobby, corridor, or another elevator
+      if(card.elevator){
+        const ok = !!(below.lobby || below.elevator || below.id==='cor');
+        if(!ok){
+          showUnsupportedMark(x,y);
+          return;
+        }
+      }
+    }
+  }
+
+  // bulldozer special (root-only)
+  if(card.bulldozer){
+    // consume
+    removeOne(state.hand, card);
+    state.selectedCard=null;
+    renderHand();
+    // next click removes
+    boardEl.querySelectorAll('.cell').forEach(c=>{
+      c.onclick = ()=>{
+        const tx=+c.dataset.x, ty=+c.dataset.y;
+        if(grid[ty][tx] && !grid[ty][tx].lobby){
+          if(confirm('Bulldoze this tile?')){
+            grid[ty][tx]=null;
+            renderGrid();
+          }
+        }
+        // restore default on next render
+        buildGrid();
+        renderGrid();
+      };
+    });
+    return;
+  }
+
+  // consume from hand
+  removeOne(state.hand, card);
+  if(card.type!=='util') state.discard.push(card);
+  state.selectedCard=null;
+  renderHand();
+
+  // place all parts
+  for(let ox=0; ox<size.w; ox++){
+    for(let oy=0; oy<size.h; oy++){
+      const tx=x+ox, ty=y+oy;
+      const tile = Object.assign({}, card, {
+        root:{x,y},
+        part:{ox,oy}
+      });
+      grid[ty][tx]=tile;
+    }
+  }
+
+  if(card.type==='room') state.roomsPlacedToday++;
+  renderGrid();
+}
+
+function cellClicked(x,y){
+  const card=state.selectedCard;
+  if(!card) return;
+  if(!state.hand.includes(card)){ state.selectedCard=null; return; }
+  placeTile(card,x,y);
+}
+
+function renderHand(){
+  handEl.innerHTML='';
+  state.hand.forEach(card=>{
+    const el=document.createElement('div');
+    el.className='card';
+    el.innerHTML=`<h4>${card.name}</h4><p>${card.desc||''}</p><div class="meta"><span>${(card.rarity||'').toUpperCase()}</span></div>`;
+    el.onclick=()=>{
+      document.querySelectorAll('#hand .card').forEach(c=>c.classList.remove('selected'));
+      el.classList.add('selected');
+      state.selectedCard=card;
+      clearGhost();
+    };
+    handEl.appendChild(el);
+  });
+}
+
+// connectivity
+function allowsHorizontal(t){ return !!t; }
+// Vertical connectivity rules:
+// - Stairs provide vertical connectivity regardless of the other tile.
+// - Elevators connect vertically only to lobby, corridor, or other elevators.
+function allowsVerticalPair(a,b){
+  if(!a || !b) return false;
+  const isLobby = t => !!t && t.lobby;
+  const isElevator = t => !!t && t.elevator;
+  const isStairs = t => !!t && t.stairs;
+  const isCorridor = t => !!t && t.id==='cor';
+  if(isStairs(a) || isStairs(b)) return true;
+  if(isElevator(a) && (isElevator(b) || isCorridor(b) || isLobby(b))) return true;
+  if(isElevator(b) && (isElevator(a) || isCorridor(a) || isLobby(a))) return true;
+  return false;
+}
+function connectedToPredicate(x,y,pred){
+  const seen=new Set();
+  const q=[[x,y]];
+  const key=(a,b)=>a+','+b;
+  seen.add(key(x,y));
+  while(q.length){
+    const [cx,cy]=q.shift();
+    const t=grid[cy][cx];
+    if(pred(t)) return true;
+    for(const [nx,ny] of neighbors(cx,cy)){
+      if(seen.has(key(nx,ny))) continue;
+      const a=grid[cy][cx], b=grid[ny][nx];
+      if(!b) continue;
+      const horiz = ny===cy, vert = nx===cx;
+      if(horiz && !(allowsHorizontal(a)&&allowsHorizontal(b))) continue;
+      if(vert && !allowsVerticalPair(a,b)) continue;
+      seen.add(key(nx,ny));
+      q.push([nx,ny]);
+    }
+  }
+  return false;
+}
+function connectedToLobby(x,y){ return connectedToPredicate(x,y,t=>t && t.lobby); }
+function connectedToElevator(x,y){ return connectedToPredicate(x,y,t=>t && t.elevator); }
+function lobbyPos(){
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    if(grid[y][x] && grid[y][x].lobby) return [x,y];
+  }
+  return null;
+}
+
+// mutations
+const MUTATION_POOL = [
+  {type:'rentPenalty', name:'Tough Market', value:0.5},
+  {type:'rentPenalty', name:'Crushing Recession', value:0.75},
+  {type:'billIncrease', name:'Double Tax', mul:2},
+  {type:'billIncrease', name:'Triple Tax', mul:3},
+  {type:'utilDisable', name:'Water Works', disable:['fount','pool']},
+  {type:'utilDisable', name:'Power Cut', disable:['pow']},
+  {type:'themeDisable', name:'Office Strike', disableThemes:['office']},
+  {type:'themeDisable', name:'Kitchen Inspection', disableThemes:['food']},
+  {type:'themeDisable', name:'Union Strike', disableThemes:['facilities']}
+];
+
+// Mad King objectives
+const OBJECTIVES = [
+  {
+    id:'hotel', name:'Hotel',
+    desc:'Recollect rent if there are more Accommodation rooms than Offices in the tower.',
+    mult:2,
+    check: ()=> countAccommodationRooms() > countOfficeRooms()
+  },
+  {
+    id:'night', name:'Nightshift',
+    desc:'Recollect rent if there are more Offices than Accommodation rooms in the tower.',
+    mult:2,
+    check: ()=> countOfficeRooms() > countAccommodationRooms()
+  },
+  {
+    id:'sky', name:'Skyscraper',
+    desc:'Recollect rent if tower height is at least 6 floors.',
+    mult:2,
+    check: ()=> towerHeight() >= 6
+  },
+  {
+    id:'amen', name:'Amenities',
+    desc:'Recollect rent if at least 4 utilities are connected to the Lobby.',
+    mult:2,
+    check: ()=> countConnectedUtilities() >= 4
+  },
+  {
+    id:'green', name:'Greenpower',
+    desc:'Recollect rent if there are more Gardens than Power Plants.',
+    mult:2,
+    check: ()=> countById('gard') > countById('pow')
+  },
+  {
+    id:'culinary', name:'Culinary Capital',
+    desc:'Recollect rent if there are more Food-themed rooms than Offices.',
+    mult:2,
+    check: ()=> countThemeRooms('food') > countOfficeRooms()
+  },
+  {
+    id:'corporate', name:'Corporate Reign',
+    desc:'Recollect rent if every floor of the tower contains an Office.',
+    mult:2,
+    check: ()=> floorsAllHaveOffice()
+  }
+];
+function rngForDay(seed){ let s=(seed*9301+49297)%233280; return ()=>{ s=(s*9301+49297)%233280; return s/233280; }; }
+function pickFromPool(count,seed){ const rng=rngForDay(seed); const pool=[...MUTATION_POOL]; const picks=[]; for(let i=0;i<count && pool.length;i++){ const idx=Math.floor(rng()*pool.length); picks.push(pool.splice(idx,1)[0]); } return picks; }
+function dayInMonth(day){ return ((day-1)%28)+1; }
+function mutationsFor(day){
+  const d=dayInMonth(day);
+  if(day<=28){
+    return [7,14,21,28].includes(d) ? pickFromPool(1,day) : [];
+  }
+  const muts=pickFromPool(1,day);
+  if(day%7===0){
+    const extra=pickFromPool(1,day+1);
+    if(extra.length){
+      if(muts.length && extra[0]===muts[0]){
+        const alt=pickFromPool(1,day+2);
+        if(alt.length) muts.push(alt[0]);
+      } else muts.push(extra[0]);
+    }
+  }
+  return muts;
+}
+function isTileInactive(tile){
+  const muts=mutationsFor(state.day);
+  if(!tile || !muts.length) return false;
+  for(const mut of muts){
+    if(mut.type==='utilDisable'){
+      if(mut.disable && mut.disable.includes(tile.id)) return true;
+      if(mut.disableThemes && tile.themes && mut.disableThemes.some(th=>tile.themes.includes(th))) return true;
+    }
+    if(mut.type==='themeDisable'){
+      if(mut.disableThemes && tile.themes && mut.disableThemes.some(th=>tile.themes.includes(th))) return true;
+    }
+  }
+  return false;
+}
+
+// bills
+function billForDay(d){
+  // day 1â€“7 stays as before (100 â†’ 5000)
+  if (d <= 1) return 100;
+  if (d <= 7) {
+    // smooth-ish ramp to 5000, still divisible by 50
+    const start = 100;
+    const end = 5000;
+    const t = (d - 1) / (7 - 1);
+    const amt = start + t * (end - start);
+    return Math.round(amt / 50) * 50;
+  }
+
+  // NEW: explicit days 8â€“14
+  if (d === 8) return 10000;
+  if (d === 9) return 25000;
+  if (d === 10) return 50000;
+  if (d === 11) return 100000;
+  if (d === 12) return 200000;
+  if (d === 13) return 350000;
+  if (d === 14) return 500000;
+
+  // keep the old late-month spikes (tuned)
+  if (d === 21) return 10000000;     // 10,000,000
+  if (d === 28) return 500000000;    // 500,000,000
+
+  // between 14 and 21 we can interpolate from 500,000 â†’ 10,000,000
+  if (d > 14 && d < 21) {
+    const startDay = 14, endDay = 21;
+    const startAmt = 500000, endAmt = 10000000;
+    const t = (d - startDay) / (endDay - startDay);
+    const amt = startAmt + t * (endAmt - startAmt);
+    return Math.round(amt / 50) * 50;
+  }
+
+  // between 21 and 28 interpolate 10,000,000 â†’ 500,000,000
+  if (d > 21 && d < 28) {
+    const startDay = 21, endDay = 28;
+    const startAmt = 10000000, endAmt = 500000000;
+    const t = (d - startDay) / (endDay - startDay);
+    const amt = startAmt + t * (endAmt - startAmt);
+    return Math.round(amt / 50) * 50;
+  }
+
+  // after 28 keep doubling per day (endless)
+  const extra = d - 28;
+  const amt = 1000000000 * Math.pow(2, extra);
+  return Math.round(amt / 50) * 50;
+}
+
+// rent
+function towerHeight(){
+  for(let y=0;y<H;y++){
+    if(grid[y].some(t=>t)) return (H - y);
+  }
+  return 0;
+}
+function countRooms(){
+  let n=0;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const t=grid[y][x];
+    if(t && t.type==='room') n++;
+  }
+  return n;
+}
+function isRootPart(t){ return !t.part || (t.part.ox===0 && t.part.oy===0); }
+function countOfficeRooms(){
+  let n=0;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const t=grid[y][x];
+    if(t && t.type==='room' && isRootPart(t) && tileIsOffice(t)) n++;
+  }
+  return n;
+}
+function countAccommodationRooms(){
+  let n=0;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const t=grid[y][x];
+    if(t && t.type==='room' && isRootPart(t) && hasTheme(t,'accommodation')) n++;
+  }
+  return n;
+}
+function countThemeRooms(theme){
+  let n=0;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const t=grid[y][x];
+    if(t && t.type==='room' && isRootPart(t) && hasTheme(t, theme)) n++;
+  }
+  return n;
+}
+function countById(id){
+  let n=0;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const t=grid[y][x];
+    if(t && t.id===id && (!t.part || (t.part.ox===0 && t.part.oy===0))) n++;
+  }
+  return n;
+}
+function countConnectedUtilities(){
+  let n=0;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const t=grid[y][x];
+    if(t && t.type==='util' && connectedToLobby(x,y)) n++;
+  }
+  return n;
+}
+function countConnectedOfficeRooms(){
+  let n=0;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const t=grid[y][x];
+    if(t && t.type==='room' && isRootPart(t) && tileIsOffice(t) && connectedToLobby(x,y)) n++;
+  }
+  return n;
+}
+
+function floorsAllHaveOffice(){
+  // find topmost occupied row
+  let top=-1;
+  for(let y=0;y<H;y++){
+    if(grid[y].some(t=>t)){ top=y; break; }
+  }
+  if(top===-1) return false; // nothing built yet
+  for(let y=top; y<H; y++){
+    let hasOffice=false;
+    for(let x=0;x<W;x++){
+      const t=grid[y][x];
+      if(t && t.type==='room' && isRootPart(t) && tileIsOffice(t)){ hasOffice=true; break; }
+    }
+    if(!hasOffice) return false;
+  }
+  return true;
+}
+function tileIsOffice(t){
+  return t && (t.id==='ofc' || t.id==='gofc' || (t.themes && t.themes.includes('office')));
+}
+function baseForTile(x,y,tile){
+  if(tile.id==='kit'){
+    let adj=false;
+    for(const [nx,ny] of neighbors(x,y)){
+      const nt=grid[ny][nx];
+      if(nt && (nt.id==='rest' || nt.id==='food')){ adj=true; break; }
+    }
+    if(!adj) return 0;
+  }
+  let base = tile.rent || 0;
+  if(hasEmp('chef') && (tile.id==='kit' || tile.id==='rest' || tile.id==='food')) base *= 1.25;
+  if(hasEmp('janitor') && (tile.id==='ofc' || tile.id==='gofc')) base *= 1.5;
+  if(hasEmp('maid') && (tile.id==='hsui' || tile.id==='lapt' || tile.id==='pent')) base *= 1.25;
+  if(tile.id==='pent' && connectedToElevator(x,y)) base *= 2;
+  return Math.floor(base);
+}
+function utilMultiplierAt(x,y){
+  let mul=1;
+  const isConn=connectedToLobby(x,y);
+
+  // global utilities
+  for(let yy=0; yy<H; yy++){
+    for(let xx=0; xx<W; xx++){
+      const u=grid[yy][xx];
+      if(!u || u.type!=='util') continue;
+      if(isTileInactive(u)) continue;
+
+      if(u.id==='gard' || u.id==='pool'){
+        if(isConn && connectedToLobby(xx,yy)){
+          let eff=u.mul||1.25;
+          if(u.id==='gard' && hasEmp('grd')) eff = 1 + (eff-1)*4;
+          if(hasEmp('plumb') && u.id==='pool') eff *= 2;
+          mul *= eff;
+        }
+      } else if(u.id==='fount'){
+        const adj = Math.abs(xx-x)+Math.abs(yy-y)===1;
+        if(adj){
+          let eff=u.mul||1.25;
+          if(hasEmp('plumb')) eff *= 2;
+          mul *= eff;
+        }
+      } else if(u.id==='pow'){
+        if(isConn && connectedToLobby(xx,yy)){
+          let eff=u.mul||2;
+          if(hasEmp('elec')) eff *= 1.5;
+          mul *= eff;
+        }
+      } else if(u.id==='zone'){
+        let count=0;
+        for(let y2=0;y2<H;y2++) for(let x2=0;x2<W;x2++){
+          const t=grid[y2][x2];
+          if(t && t.type==='room' && hasTheme(t,'accommodation') && connectedToLobby(x2,y2)) count++;
+        }
+        mul *= (1 + 0.05*count);
+      } else if(u.id==='vault'){
+        let eff=3;
+        let secAdj=false;
+        for(const [nx,ny] of neighbors(xx,yy)){
+          const nt=grid[ny][nx];
+          if(nt && nt.id==='sec'){ secAdj=true; break; }
+        }
+        if(secAdj) eff *= 2;
+        if(hasEmp('rob')) eff *= 2;
+        if(isConn && connectedToLobby(xx,yy)) mul *= eff;
+      } else if(u.id==='ant'){
+        let floor=(H-1 - yy);
+        let add=0.08*floor;
+        let hasMaint=false;
+        for(let y2=0;y2<H;y2++) for(let x2=0;x2<W;x2++){
+          const t=grid[y2][x2];
+          if(t && t.id==='mnt' && connectedToLobby(x2,y2)) hasMaint=true;
+        }
+        if(hasMaint) add *= (hasEmp('handy') ? 4.5 : 3);
+        mul *= (1 + add);
+      }
+    }
+  }
+
+  // gym adjacency: +25% to adjacent offices
+  for(const [nx,ny] of neighbors(x,y)){
+    const nt=grid[ny][nx];
+    if(nt && nt.id==='gym' && !isTileInactive(nt)){
+      const tile=grid[y][x];
+      if(tileIsOffice(tile)){
+        mul *= 1.25;
+      }
+    }
+  }
+
+  // mutation rent penalties
+  const muts=mutationsFor(state.day);
+  if(muts.length){
+    for(const m of muts){
+      if(m.type==='rentPenalty') mul *= (1 - m.value);
+    }
+  }
+
+  return mul;
+}
+
+// to highlight which utils contributed
+function utilContributorsAt(x,y){
+  const out=[];
+  const isConn=connectedToLobby(x,y);
+  for(let yy=0; yy<H; yy++){
+    for(let xx=0; xx<W; xx++){
+      const u=grid[yy][xx];
+      if(!u || u.type!=='util') continue;
+      if(isTileInactive(u)) continue;
+      if(u.id==='gard' || u.id==='pool'){
+        if(isConn && connectedToLobby(xx,yy)) out.push({x:xx,y:yy});
+      } else if(u.id==='fount'){
+        const adj = Math.abs(xx-x)+Math.abs(yy-y)===1;
+        if(adj) out.push({x:xx,y:yy});
+      } else if(u.id==='pow'){
+        if(isConn && connectedToLobby(xx,yy)) out.push({x:xx,y:yy});
+      } else if(u.id==='zone'){
+        out.push({x:xx,y:yy});
+      } else if(u.id==='vault'){
+        if(isConn && connectedToLobby(xx,yy)) out.push({x:xx,y:yy});
+      } else if(u.id==='ant'){
+        out.push({x:xx,y:yy});
+        for(let y2=0;y2<H;y2++) for(let x2=0;x2<W;x2++){
+          const t=grid[y2][x2];
+          if(t && t.id==='mnt' && connectedToLobby(x2,y2)) out.push({x:x2,y:y2});
+        }
+      }
+    }
+  }
+  const seen=new Set();
+  return out.filter(p=>{
+    const k=p.x+','+p.y;
+    if(seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+// helper: estimate base and multiplier for a prospective room placement
+function estimateBaseAndMul(card,x,y){
+  const prev = grid[y][x];
+  try{
+    // Temporarily place a minimal representation so adjacency rules (e.g., gym) apply
+    grid[y][x] = Object.assign({}, card, { type: card.type||'room' });
+    const base = Math.floor(baseForTile(x,y,grid[y][x])||0);
+    const mul = utilMultiplierAt(x,y)||1;
+    return {base, mul};
+  } finally {
+    grid[y][x] = prev;
+  }
+}
+
+function computeRent(){
+  const lp=lobbyPos();
+  if(!lp) return {items:[],total:0,bill:0};
+  const items=[];
+  let total=0;
+
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const t=grid[y][x];
+      if(!t || t.type!=='room') continue;
+      // skip non-root parts
+      if(t.part && !(t.part.ox===0 && t.part.oy===0)) continue;
+
+      const conn=connectedToLobby(x,y);
+      if(!conn){
+        items.push({x,y,name:t.name||t.id,base:0,mul:1,total:0});
+        continue;
+      }
+
+      let base=baseForTile(x,y,t);
+      let mul=utilMultiplierAt(x,y);
+      const rent=Math.floor(base*mul);
+      total+=rent;
+      items.push({x,y,name:t.name||t.id,base:Math.floor(base),mul:Math.round(mul*100)/100,total:rent});
+    }
+  }
+
+  let bill = billForDay(state.day);
+  const muts=mutationsFor(state.day);
+  if(muts.length){
+    for(const m of muts){
+      if(m.type==='billIncrease') bill = Math.round(bill*(m.mul||1));
+    }
+  }
+
+  return {items,total,bill};
+}
+
+// invoice
+async function runInvoice(){
+  switchScene('build');
+  // Discard any unplayed hand cards at end of day
+  discardHand();
+  invoiceEl.innerHTML='';
+  if(invoiceSubtotalEl) invoiceSubtotalEl.textContent='Subtotal: $0';
+  const rewardElInit = document.getElementById('invoiceMadReward');
+  const subAfterElInit = document.getElementById('invoiceSubtotalAfter');
+  if(rewardElInit) rewardElInit.textContent = `Mad King's Reward: $0`;
+  if(subAfterElInit) subAfterElInit.textContent = `Subtotal (After Reward): $0`;
+  if(invoiceGrandTotalEl) invoiceGrandTotalEl.textContent='Total: $0';
+  const report=computeRent();
+  if(invoiceBillsEl) invoiceBillsEl.textContent = `Today's Bills: $${fmt(report.bill)}`;
+
+
+  let subtotal=0;
+  let delayPer=250;
+
+
+  const list = document.createElement('div');
+  invoiceEl.appendChild(list);
+
+  for(const it of report.items){
+    const cell=getCell(it.x,it.y);
+    if(cell) cell.classList.add('collecting');
+    await delay(delayPer);
+
+    const utilDelta = Math.max(0, it.total - it.base);
+
+    const baseRow=document.createElement('div');
+    baseRow.className='invoice-entry';
+    baseRow.innerHTML=`<span class="name">${it.name} base</span><span class="amount">$${fmt(it.base)}</span>`;
+    const utilRow=document.createElement('div');
+    utilRow.className='invoice-entry utility';
+    utilRow.innerHTML=`<span class="name">Utilities Ã—${it.mul.toFixed(2)}</span><span class="amount">+$${fmt(utilDelta)}</span>`;
+    list.prepend(utilRow);
+    list.prepend(baseRow);
+
+    // highlight contributing utilities
+    const utils=utilContributorsAt(it.x,it.y);
+    utils.forEach(u=>{
+      const uc=getCell(u.x,u.y);
+      if(uc){
+        uc.classList.add('util-collecting');
+        setTimeout(()=>uc.classList.remove('util-collecting'),260);
+      }
+    });
+
+    subtotal += (it.base + utilDelta);
+    if(invoiceSubtotalEl) invoiceSubtotalEl.textContent = `Subtotal: $${fmt(subtotal)}`;
+    if(cell){ setTimeout(()=>cell.classList.remove('collecting'),160); }
+
+    invoiceEl.scrollTo({top:0,behavior:'smooth'});
+    delayPer = Math.max(10, Math.floor(delayPer*0.9));
+  }
+
+  // Compute Mad King's reward and post-reward subtotal (recollect rent per achieved modifier)
+  let rewardAmount = 0;
+  if(state.mode==='madking' && Array.isArray(state.madObjectives) && state.madObjectives.length){
+    let achieved = 0;
+    for(const obj of state.madObjectives){
+      try{
+        if(obj && typeof obj.check==='function'){
+          if(obj.check()) achieved++;
+        }
+      }catch(_){ /* ignore */ }
+    }
+    rewardAmount = subtotal * achieved;
+    subtotal = subtotal + rewardAmount;
+  }
+  const rewardEl = document.getElementById('invoiceMadReward');
+  const subAfterEl = document.getElementById('invoiceSubtotalAfter');
+  if(rewardEl) rewardEl.textContent = `Mad King's Reward: $${fmt(rewardAmount)}`;
+  if(subAfterEl) subAfterEl.textContent = `Subtotal (After Reward): $${fmt(subtotal)}`;
+  if(invoiceGrandTotalEl) invoiceGrandTotalEl.textContent = `Total: $${fmt(subtotal - report.bill)}`;
+
+
+  const btn=document.getElementById('confirmInvoiceBtn');
+  if(btn){
+    btn.disabled=false;
+    btn.onclick = ()=>{
+      const rooms=countRooms();
+      const height=Math.max(1,towerHeight());
+      const income=5 * rooms * height;
+      const score = subtotal - report.bill;
+      if(score < 0){
+        showGameOver();
+        return;
+      }
+      state.money += income;
+      updateMoney();
+      invoiceEl.innerHTML='';
+      if(invoiceSubtotalEl) invoiceSubtotalEl.textContent='Subtotal: $0';
+      if(invoiceBillsEl) invoiceBillsEl.textContent="Today's Bills: $0";
+      if(invoiceGrandTotalEl) invoiceGrandTotalEl.textContent='Total: $0';
+      showDailySummary(report, subtotal);
+    };
+  }
+}
+
+function showDailySummary(report, subtotal){
+  const bill = report.bill;
+  const score = subtotal - bill;
+  const rooms = countRooms();
+  const height = Math.max(1, towerHeight());
+  const income = 5 * rooms * height;
+  const most = report.items.reduce((a,b)=> (b.total > (a?a.total:0)) ? b : a, null);
+  const roomsToday = state.roomsPlacedToday || 0;
+
+  dailySummaryEl.innerHTML = `
+    <div class="invoice-entry"><span class="name">Rent Subtotal</span><span class="amount">$${fmt(subtotal)}</span></div>
+    <div class="invoice-entry"><span class="name">Today's Bills</span><span class="amount">-$${fmt(bill)}</span></div>
+    <div class="invoice-total"><span>Score</span><span class="amount">$${fmt(score)}</span></div>
+    <hr style="border:none; border-top:1px solid #223041; margin:8px 0;" />
+    <div class="invoice-entry"><span class="name">Building Budget</span><span class="amount">$${fmt(income)}</span></div>
+    <div class="invoice-entry"><span class="name">Rooms Placed Today</span><span class="amount">${fmt(roomsToday)}</span></div>
+    <div class="invoice-entry"><span class="name">Most Valuable Room</span><span class="amount">${most? most.name+` ($${fmt(most.total)})` : 'â€”'}</span></div>
+  `;
+
+  document.getElementById('dailyContinueBtn').onclick = ()=>{
+    if(!state.endless && dayInMonth(state.day)===28){
+      showWin();
+      return;
+    }
+    state.rerolledToday=false;
+    generateShop();
+    switchScene('shop');
+  };
+
+  switchScene('daily');
+}
+
+// shop
+function removeOne(arr,item){ const i=arr.indexOf(item); if(i>=0) arr.splice(i,1); }
+function baseCostFor(card){ const table={ common:100, uncommon:300, rare:550, epic:800, legendary:1000 }; return table[card.rarity] || 100; }
+function getCardCost(card){ const base=baseCostFor(card); const mult=state.priceBoost[card.id] || 1; return base * mult; }
+function getRerollCost(){ return hasEmp('pshop') ? 0 : (10 * Math.max(1, towerHeight())); }
+
+function generateShop(){
+  const isBasic=c=> (c.rarity==='basic' || c.id==='apt' || c.id==='ofc' || c.id==='cor');
+  let poolRooms = cardPool.filter(c=>c.type==='room' && !isBasic(c));
+  let poolUtils = cardPool.filter(c=>c.type==='util' && !isBasic(c));
+  if(hasEmp('fore')){
+    const b = poolUtils.find(c=>c.id==='bulldozer');
+    if(b){ for(let i=0;i<4;i++) poolUtils.push(b); }
+  }
+  if(hasEmp('arch')){
+    poolRooms = poolRooms.filter(c=>c.rarity!=='common');
+    poolUtils = poolUtils.filter(c=>c.rarity!=='common');
+  }
+  if(hasEmp('bmgr')){
+    poolUtils = poolUtils.map(c=> c.id==='vault' ? Object.assign({}, c, {rarity:'uncommon'}) : c);
+  }
+
+  const rarityWeights=[ {type:'common',weight:39}, {type:'uncommon',weight:30}, {type:'rare',weight:20}, {type:'epic',weight:10}, {type:'legendary',weight:1} ];
+  const pickRarity = ()=>{ const roll=Math.random()*100; let acc=0; for(const r of rarityWeights){ acc+=r.weight; if(roll<=acc) return r.type; } return 'common'; };
+  function pickFrom(pool){
+    if(!pool.length) return null;
+    const r=pickRarity();
+    const cands=pool.filter(c=>c.rarity===r);
+    if(cands.length) return Object.assign({_sold:false}, choice(cands));
+    return Object.assign({_sold:false}, choice(pool));
+  }
+
+  const rooms=[pickFrom(poolRooms), pickFrom(poolRooms), pickFrom(poolRooms)];
+  const utils=[pickFrom(poolUtils), pickFrom(poolUtils), pickFrom(poolUtils)];
+  state.shop = [...rooms, ...utils].map(c=> c || Object.assign({_sold:true}, {id:'empty',name:'â€”',desc:'',rarity:'common'}));
+  renderShop();
+}
+
+function renderShop(){
+  shopEl.innerHTML='';
+  state.shop.forEach((card,idx)=>{
+    const el=document.createElement('div');
+    el.className='shop-card'+(card._sold?' sold':'');
+    el.innerHTML = `<h4>${card.name}</h4><p>${card.desc||''}</p><div class="meta">${(card.rarity||'').toUpperCase()} ${!card._sold ? ' â€” $'+fmt(getCardCost(card)) : ''}</div>`;
+    if(!card._sold && card.id!=='empty'){
+      el.onclick = ()=>{
+        const cost=getCardCost(card);
+        if(state.money < cost) return;
+        state.money -= cost;
+        updateMoney();
+        if(card.type==='room' || card.type==='conn' || card.type==='util'){
+          state.discard.push(card);
+        }
+        state.priceBoost[card.id] = (state.priceBoost[card.id]||1) * 2;
+        card._sold=true;
+        renderShop();
+      };
+    } else if(card._sold){
+      const sb=document.createElement('div');
+      sb.className='sold-badge';
+      sb.textContent='Purchased';
+      el.appendChild(sb);
+    }
+    shopEl.appendChild(el);
+  });
+  if(rerollCostEl) rerollCostEl.textContent = fmt(getRerollCost());
+}
+
+function showBurn(){
+  const top=state.discard.slice(-5);
+  burnRowEl.innerHTML='';
+  top.forEach((c,idx)=>{
+    const el=document.createElement('div');
+    el.className='card';
+    el.innerHTML=`<h4>${c.name}</h4><p>${c.desc||''}</p>`;
+    el.onclick=()=>{
+      const burnCost = 10 * Math.pow(2, idx);
+      if(state.money < burnCost) return;
+      state.money -= burnCost;
+      updateMoney();
+      state.discard.splice(state.discard.indexOf(c),1);
+      showBurn();
+    };
+    burnRowEl.appendChild(el);
+  });
+  burnRowEl.style.display='flex';
+}
+
+// calendar
+function renderCalendar(){
+  const gridEl=document.getElementById('calendarGrid');
+  if(!gridEl) return;
+  gridEl.innerHTML='';
+  for(let i=1;i<=28;i++){
+    const d=document.createElement('div');
+    d.className='calendar-cell'+(dayInMonth(state.day)===i ? ' today':'');
+    const bill=billForDay(i);
+    const muts=mutationsFor(i);
+    // Build modifiers tooltip (Mad King mode)
+    let modsNames=[];
+    if(state.mode==='madking'){
+      const thresholds=[1,8,15,22];
+      const count = thresholds.filter(t=> i>=t).length;
+      for(let idx=0; idx<count; idx++){
+        if(state.madObjectives && state.madObjectives[idx]) modsNames.push(state.madObjectives[idx].name);
+        else modsNames.push('Unknown');
+      }
+    }
+    const tipLines = [
+      `Day ${i}`,
+      `Bills: $${fmt(bill)}`,
+      muts.length ? `Mutations: ${muts.map(m=>m.name).join(', ')}` : 'Mutations: None',
+      (state.mode==='madking') ? (modsNames.length? `Modifiers: ${modsNames.join(', ')}` : 'Modifiers: None') : null
+    ].filter(Boolean);
+    d.title = tipLines.join('\n');
+    d.innerHTML = `<div>Day ${i}</div><div>$${fmt(bill)}</div>${muts.length? `<div class="calendar-mutation">${muts.map(m=>m.name).join(' â€¢ ')}</div>` : ''}`;
+    gridEl.appendChild(d);
+  }
+  const infoBills=document.getElementById('calendarInfoBills');
+  if(infoBills) infoBills.querySelector('.amount').textContent = '$'+fmt(billForDay(state.day));
+  const infoMut=document.getElementById('calendarInfoMutation');
+  if(infoMut){
+    const muts=mutationsFor(state.day);
+    infoMut.querySelector('.amount').textContent = muts.length? muts.map(m=>m.name).join(', ') : 'None';
+  }
+  // Populate Mad King's Modifiers for Today panel
+  const modsList=document.getElementById('calendarInfoModsList');
+  const modsHeader=document.getElementById('calendarInfoModsHeader');
+  if(modsList){
+    modsList.innerHTML='';
+    if(state.mode==='madking' && state.madObjectives && state.madObjectives.length){
+      if(modsHeader) modsHeader.style.display='block';
+      for(const obj of state.madObjectives){
+        const row=document.createElement('div');
+        row.className='invoice-entry';
+        let met=false;
+        try{ met = !!(obj && typeof obj.check==='function' && obj.check()); }catch(_){ met=false; }
+        const icon = met ? '&#10003;' : '&#10007;';
+        const color = met ? 'var(--money)' : 'var(--danger)';
+        row.innerHTML = `<span class=\"name\">${obj.name}</span><span class=\"amount\" style=\"color:${color}\">${icon}</span>`;
+        const sub=document.createElement('div');
+        sub.style.fontSize='12px'; sub.style.color='var(--muted)'; sub.style.marginTop='2px';
+        sub.textContent = obj.desc;
+        row.appendChild(sub);
+        modsList.appendChild(row);
+      }
+    } else {
+      if(modsHeader) modsHeader.style.display='none';
+    }
+  }
+}
+
+// employees rendering
+function renderEmployees(){
+  employeesEl.innerHTML='';
+  state.employees.forEach(e=>{
+    const el=document.createElement('div');
+    el.className='card';
+    el.innerHTML=`<h4>${e.icon} ${e.name}</h4><p>${e.text}</p>`;
+    employeesEl.appendChild(el);
+  });
+  const c = document.getElementById('employeesCount'); if(c) c.textContent = state.employees.length;
+}
+
+function randomEmployees(n){
+  const pool = EMPLOYEES.filter(e=>!state.employees.some(se=>se.id===e.id));
+  shuffle(pool);
+  return pool.slice(0,n);
+}
+function openHire(){
+  const mx=document.getElementById('hireMax'); if(mx) mx.textContent = state.maxEmployees;
+  hireOffers = randomEmployees(4);
+  hireSelection=-1; replaceSelection=-1;
+  renderHire();
+  switchScene('hire');
+}
+function renderHire(){
+  const cur=document.getElementById('hireCurrent');
+  const off=document.getElementById('hireOffers');
+  const hireBtn=document.getElementById('hireConfirmBtn');
+  const skipBtn=document.getElementById('hireSkipBtn');
+  if(!cur || !off) return;
+  cur.innerHTML=''; off.innerHTML='';
+  state.employees.forEach((e,idx)=>{
+    const el=document.createElement('div');
+    el.className='card'+(replaceSelection===idx?' selected':'');
+    el.innerHTML=`<h4>${e.icon} ${e.name}</h4><p>${e.text}</p>`;
+    el.onclick=()=>{ replaceSelection=(replaceSelection===idx?-1:idx); renderHire(); };
+    cur.appendChild(el);
+  });
+  hireOffers.forEach((e,idx)=>{
+    const el=document.createElement('div');
+    el.className='card'+(hireSelection===idx?' selected':'');
+    el.innerHTML=`<h4>${e.icon||''} ${e.name}</h4><p>${e.text||''}</p>`;
+    el.onclick=()=>{ hireSelection=(hireSelection===idx?-1:idx); renderHire(); };
+    off.appendChild(el);
+  });
+  const needsReplace = state.employees.length >= state.maxEmployees;
+  if(hireBtn){
+    hireBtn.disabled = !(hireSelection>=0) || (needsReplace && replaceSelection<0);
+    hireBtn.onclick = ()=>{
+      if(!(hireSelection>=0)) return;
+      const pick=hireOffers[hireSelection];
+      if(!needsReplace) state.employees.push(pick);
+      else state.employees.splice(replaceSelection,1,pick);
+      renderEmployees();
+      proceedAfterHire();
+    };
+  }
+  if(skipBtn){
+    skipBtn.disabled=false;
+    skipBtn.onclick = ()=>{ proceedAfterHire(); };
+  }
+}
+function proceedAfterHire(){
+  drawHand(5);
+  renderHand();
+  if(invoiceBillsEl) invoiceBillsEl.textContent = `Today's Bills: $${fmt(billForDay(state.day))}`;
+  renderTasks();
+  switchScene('tasks');
+}
+
+// scene switching
+function switchScene(name){
+  Object.values(scenes).forEach(s=>s.classList.remove('active'));
+  if(scenes[name]) scenes[name].classList.add('active');
+  state.scene=name;
+}
+
+function updateMoney(){ moneyEl.textContent = fmt(state.money); }
+
+function placeInitialLobby(){
+  const x=Math.floor(W/2);
+  grid[H-1][x] = { id:'lob', name:'Lobby', type:'conn', lobby:true };
+}
+
+function initDeck(){
+  state.deck = [
+    ...Array(2).fill(cardPool.find(c=>c.id==='apt')),
+    ...Array(2).fill(cardPool.find(c=>c.id==='ofc')),
+    ...Array(2).fill(cardPool.find(c=>c.id==='ele')),
+    ...Array(2).fill(cardPool.find(c=>c.id==='rest')),
+    cardPool.find(c=>c.id==='gard'),
+    cardPool.find(c=>c.id==='lob'),
+    cardPool.find(c=>c.id==='gofc'),
+    cardPool.find(c=>c.id==='lapt')
+  ].filter(Boolean);
+  shuffle(state.deck);
+}
+
+function drawHand(n){
+  while(state.hand.length<n){
+    if(!state.deck.length){
+      state.deck = shuffle(state.discard.slice());
+      state.discard = [];
+      if(!state.deck.length) break;
+    }
+    state.hand.push(state.deck.pop());
+  }
+  renderHand();
+}
+
+// tasks (today's bills and mutations)
+function renderTasks(){
+  const billsEl = document.getElementById('tasksBills');
+  if(billsEl){ billsEl.querySelector('.amount').textContent = '$'+fmt(billForDay(state.day)); }
+  const mutsEl = document.getElementById('tasksMutations');
+  if(mutsEl){
+    const muts = mutationsFor(state.day);
+    const listEl = document.getElementById('tasksMutList');
+    if(listEl) listEl.innerHTML='';
+    if(!muts.length){
+      mutsEl.querySelector('.amount').textContent = 'None';
+    } else {
+      mutsEl.querySelector('.amount').textContent = '';
+      // Helpers for readable descriptions
+      const nameForCardId = (id)=>{ const c=cardPool.find(cc=>cc.id===id); return c? c.name : id; };
+      const THEME_LABELS = { office:'Office', food:'Food', facilities:'Facilities', accommodation:'Accommodation' };
+      const themeLabel = (k)=> THEME_LABELS[k] || (k.charAt(0).toUpperCase()+k.slice(1));
+      for(const m of muts){
+        let desc='';
+        if(m.type==='rentPenalty'){
+          desc = `Rent reduced by ${Math.round((m.value||0)*100)}%`;
+        } else if(m.type==='billIncrease'){
+          desc = `Today's bills multiplied by ${(m.mul||1)}x`;
+        } else if(m.type==='utilDisable'){
+          const parts=[];
+          if(m.disable && m.disable.length){
+            const names=m.disable.map(nameForCardId);
+            parts.push(`Disabled utilities: ${names.join(', ')}`);
+          }
+          if(m.disableThemes && m.disableThemes.length){
+            const labels=m.disableThemes.map(themeLabel);
+            parts.push(`Disabled themes: ${labels.join(', ')}`);
+          }
+          desc = parts.join(' â€¢ ');
+        } else if(m.type==='themeDisable'){
+          const labels=(m.disableThemes||[]).map(themeLabel);
+          desc = labels.length? `Rooms/utilities with themes inactive: ${labels.join(', ')}` : 'Theme-based rooms/utilities inactive';
+        }
+        const row=document.createElement('div');
+        row.className='invoice-entry';
+        row.innerHTML = `<span class=\"name\">${m.name}</span>`;
+        const sub=document.createElement('div');
+        sub.style.fontSize='12px'; sub.style.color='var(--muted)'; sub.style.marginTop='2px';
+        sub.textContent = desc;
+        row.appendChild(sub);
+        if(listEl) listEl.appendChild(row);
+      }
+    }
+  }
+  // Mad King's Modifiers list (Mad King mode)
+  const listObj = document.getElementById('tasksObjectiveList');
+  const modsHeader = document.getElementById('tasksModsHeader');
+  if(listObj){
+    listObj.innerHTML = '';
+    const showMods = (state.mode==='madking' && state.madObjectives && state.madObjectives.length);
+    if(modsHeader) modsHeader.style.display = showMods ? 'block' : 'none';
+    if(showMods){
+      for(const obj of state.madObjectives){
+        const row=document.createElement('div');
+        row.className='invoice-entry';
+        let met=false;
+        try{ met = !!(obj && typeof obj.check==='function' && obj.check()); }catch(_){ met=false; }
+        const icon = met ? '&#10003;' : '&#10007;';
+        const color = met ? 'var(--money)' : 'var(--danger)';
+        row.innerHTML = `<span class=\"name\">${obj.name}</span><span class=\"amount\" style=\"color:${color}\">${icon}</span>`;
+        const sub=document.createElement('div');
+        sub.style.fontSize='12px'; sub.style.color='var(--muted)'; sub.style.marginTop='2px';
+        sub.textContent = obj.desc;
+        row.appendChild(sub);
+        listObj.appendChild(row);
+      }
+    }
+  }
+  const btn = document.getElementById('tasksContinueBtn');
+  if(btn){ btn.onclick = ()=>{ switchScene('build'); }; }
+}
+
+function discardHand(){
+  if(state.hand && state.hand.length){
+    // Move all remaining hand cards to discard
+    for(const c of state.hand){ state.discard.push(c); }
+    state.hand.length = 0;
+    state.selectedCard = null;
+    clearGhost && clearGhost();
+    renderHand();
+  }
+}
+
+function nextDay(){
+  // Safety: ensure previous day's hand doesn't carry over
+  discardHand();
+  state.selectedCard = null;
+  state.day++;
+  dayEl.textContent = state.day;
+  state.rentSpeed=250;
+  state.roomsPlacedToday=0;
+  state.rerolledToday=false;
+
+  if(state.endless){
+    const topOcc = grid[0].some(t=>t);
+    if(topOcc){
+      grid.unshift(Array(W).fill(null));
+      H++;
+      buildGrid();
+      renderGrid();
+    }
+  }
+
+  // Mad King objectives persist and stack on days 1, 8, 15, 22
+  if(state.mode==='madking'){
+    if(!Array.isArray(state.madObjectives)) state.madObjectives=[];
+    const d = dayInMonth(state.day);
+    if([1,8,15,22].includes(d)){
+      // pick a new objective, avoiding duplicates until pool exhausted
+      const existing = new Set(state.madObjectives.map(o=>o.id));
+      const pool = OBJECTIVES.filter(o=> !existing.has(o.id));
+      const pick = pool.length ? choice(pool) : choice(OBJECTIVES);
+      state.madObjectives.push(pick);
+    }
+  } else {
+    state.madObjectives = [];
+  }
+
+  // hire screen at week start
+  if(((state.day-1)%7)===0){
+    openHire();
+    return;
+  }
+
+  // Prepare build state
+  drawHand(5);
+  if(invoiceBillsEl) invoiceBillsEl.textContent = `Today's Bills: $${fmt(billForDay(state.day))}`;
+  // Show today's tasks before build
+  renderTasks();
+  switchScene('tasks');
+}
+
+function showGameOver(){
+  switchScene('gameover');
+  const go=document.getElementById('gameOverSummary');
+  if(go) go.textContent = `You reached day ${state.day}.`;
+}
+
+function showWin(){
+  switchScene('win');
+  const w=document.getElementById('winSummary');
+  if(w) w.textContent = `You survived 28 days with $${fmt(state.money)}.`;
+}
+
+// wire UI
+function wireUI(){
+  const sb=document.getElementById('startBtn');
+  if(sb) sb.onclick = ()=>{
+    // pick mode
+    const sel = document.querySelector('input[name="mode"]:checked');
+    const picked = sel ? sel.value : 'classic';
+    init();
+    state.mode = picked;
+    nextDay();
+  };
+
+  const endBtn=document.getElementById('endDayBtn');
+  if(endBtn) endBtn.onclick = ()=>{ runInvoice(); };
+
+  const calBtn=document.getElementById('calendarBtn');
+  if(calBtn) calBtn.onclick = ()=>{ renderCalendar(); switchScene('calendar'); const cCont=document.getElementById('calendarContinueBtn'); if(cCont){ cCont.style.display='inline-block'; cCont.onclick = ()=>{ switchScene('build'); }; } };
+
+  const calClose=document.getElementById('closeCalendarBtn');
+  if(calClose) calClose.onclick = ()=>{ switchScene('build'); };
+
+  if(rerollBtn) rerollBtn.onclick = ()=>{
+    const cost=getRerollCost();
+    if(state.rerolledToday) return;
+    if(state.money < cost) return;
+    state.money -= cost;
+    updateMoney();
+    state.rerolledToday=true;
+    generateShop();
+  };
+
+  const burnBtn=document.getElementById('burnBtn');
+  if(burnBtn) burnBtn.onclick = ()=>{ showBurn(); };
+
+  const nextBtn=document.getElementById('nextDayBtn');
+  if(nextBtn) nextBtn.onclick = ()=>{ burnRowEl.style.display='none'; nextDay(); };
+
+  const restart=document.getElementById('restartBtn');
+  if(restart) restart.onclick = ()=>{ init(); };
+
+  const endless=document.getElementById('endlessBtn');
+  if(endless) endless.onclick = ()=>{ state.endless=true; state.maxEmployees=6; switchScene('build'); };
+
+  // Save/Load buttons
+  const saveBtn=document.getElementById('saveBtn');
+  if(saveBtn) saveBtn.onclick = ()=>{ saveGame(); };
+  const loadBtn=document.getElementById('loadBtn');
+  if(loadBtn) loadBtn.onclick = ()=>{ loadGame(); };
+}
+
+function init(){
+  state.day=0;
+  state.money=250;
+  state.maxEmployees=4;
+  state.employees=[];
+  state.rerolledToday=false;
+  state.endless=false;
+  state.roomsPlacedToday=0;
+  state.priceBoost={};
+  state.hand=[];
+  state.discard=[];
+  state.scene='start';
+  state.madObjectives=[];
+
+  grid = Array.from({length:H}, ()=>Array(W).fill(null));
+  placeInitialLobby();
+  initDeck();
+  buildGrid();
+  renderGrid();
+  renderEmployees();
+  updateMoney();
+  dayEl.textContent = state.day;
+  switchScene('start');
+}
+
+// --- save/load ---
+function serializeGame(){
+  const packCards = (arr)=> (arr||[]).map(c=> c && c.id ? c.id : c);
+  const data = {
+    version:1,
+    W, H,
+    day: state.day,
+    money: state.money,
+    maxEmployees: state.maxEmployees,
+    employees: (state.employees||[]).map(e=> e.id || e),
+    rerolledToday: !!state.rerolledToday,
+    endless: !!state.endless,
+    roomsPlacedToday: state.roomsPlacedToday||0,
+    priceBoost: state.priceBoost||{},
+    deck: packCards(state.deck),
+    hand: packCards(state.hand),
+    discard: packCards(state.discard),
+    shop: (state.shop||[]).map(c=> ({id: c.id, _sold: !!c._sold})),
+    grid: grid.map(row=> row.map(t=> t ? ({
+      id: t.id, type: t.type, name: t.name,
+      lobby: !!t.lobby, elevator: !!t.elevator, stairs: !!t.stairs,
+      themes: t.themes||[], size: t.size||{w:1,h:1}, part: t.part||null, root: t.root||null
+    }) : null))
+  };
+  return JSON.stringify(data);
+}
+
+function saveGame(){
+  try{
+    localStorage.setItem('tower-save', serializeGame());
+    alert('Game saved');
+  }catch(e){ console.error('Save failed', e); alert('Save failed'); }
+}
+
+function hydrateCard(id){
+  const c = (typeof id==='string') ? (cardPool.find(cc=>cc.id===id) || null) : id;
+  return c ? Object.assign({}, c) : null;
+}
+
+function loadGame(){
+  try{
+    const raw = localStorage.getItem('tower-save');
+    if(!raw){ alert('No save found'); return; }
+    const data = JSON.parse(raw);
+    if(!data) return;
+    H = data.H || H;
+    grid = (data.grid||[]).map(row=> (row||[]).map(t=> t ? Object.assign({}, t) : null));
+    state.day = data.day||0;
+    state.money = data.money||0;
+    state.maxEmployees = data.maxEmployees||4;
+    state.employees = (data.employees||[]).map(id=> ({id}));
+    state.rerolledToday = !!data.rerolledToday;
+    state.endless = !!data.endless;
+    state.roomsPlacedToday = data.roomsPlacedToday||0;
+    state.priceBoost = data.priceBoost||{};
+    state.deck = (data.deck||[]).map(hydrateCard).filter(Boolean);
+    state.hand = (data.hand||[]).map(hydrateCard).filter(Boolean);
+    state.discard = (data.discard||[]).map(hydrateCard).filter(Boolean);
+    state.shop = (data.shop||[]).map(s=>{
+      const base = hydrateCard(s.id) || {id:s.id,name:s.id,rarity:'common'};
+      base._sold = !!s._sold; return base;
+    });
+    buildGrid();
+    renderGrid();
+    renderEmployees();
+    renderShop && renderShop();
+    renderHand && renderHand();
+    updateMoney();
+    dayEl.textContent = state.day;
+    switchScene('build');
+  }catch(e){ console.error('Load failed', e); alert('Load failed'); }
+}
+
+// --- layout tweaks (UI reflow) ---
+function setupTopCalendarButton(){
+  const oldDockCal = document.querySelector('#scene-build .dock-grid #calendarBtn');
+  if(oldDockCal) oldDockCal.remove();
+  if(!document.getElementById('calendarBtn')){
+    const stats = document.querySelector('.top .stats');
+    if(stats){
+      const btn = document.createElement('button');
+      btn.id = 'calendarBtn';
+      btn.textContent = 'Calendar';
+      btn.style.marginLeft = '6px';
+      stats.appendChild(btn);
+    }
+  }
+  // Ensure Save/Load buttons in top bar
+  const stats = document.querySelector('.top .stats');
+  if(stats){
+    if(!document.getElementById('saveBtn')){
+      const sb = document.createElement('button');
+      sb.id = 'saveBtn';
+      sb.textContent = 'Save';
+      stats.appendChild(sb);
+    }
+    if(!document.getElementById('loadBtn')){
+      const lb = document.createElement('button');
+      lb.id = 'loadBtn';
+      lb.textContent = 'Load';
+      stats.appendChild(lb);
+    }
+  }
+}
+function setupBuildSceneLayout(){
+  const dockGrid = document.querySelector('#scene-build .dock-grid');
+  if(dockGrid){
+    dockGrid.style.gridTemplateColumns = '1fr';
+    const children = dockGrid.querySelectorAll(':scope > div');
+    if(children[1]) children[1].style.display = 'none';
+    if(children[2]) children[2].style.display = 'none';
+  }
+  const buildGrid = document.querySelector('#scene-build .build-grid');
+  if(buildGrid){
+    buildGrid.style.gridTemplateColumns = '20% 1fr 320px';
+    let leftCol = document.getElementById('buildEmployeesCol');
+    if(!leftCol){
+      leftCol = document.createElement('div');
+      leftCol.id = 'buildEmployeesCol';
+      const hdr = document.createElement('h3');
+      hdr.style.margin = '0 0 6px 0';
+      hdr.textContent = 'Employees';
+      leftCol.appendChild(hdr);
+      const firstChild = buildGrid.firstElementChild;
+      if(firstChild) buildGrid.insertBefore(leftCol, firstChild);
+      else buildGrid.appendChild(leftCol);
+    }
+    const employeesList = document.getElementById('employees');
+    if(employeesList && employeesList.parentElement !== leftCol){
+      leftCol.appendChild(employeesList);
+      employeesList.classList.add('hand');
+    }
+  }
+}
+document.addEventListener('DOMContentLoaded', ()=>{
+  init();
+  // UI layout tweaks
+  try{ setupTopCalendarButton(); setupBuildSceneLayout(); }catch(_){}
+  wireUI();
+  // Ensure correct title (override any mojibake)
+  try{ document.title = 'Tower Deck — 9x9 (Multi-tile + Gym)'; }catch(_){}
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e)=>{
+    const k = (e.key||'').toLowerCase();
+    if(k==='escape'){
+      state.selectedCard = null;
+      try{ clearGhost && clearGhost(); }catch(_){}
+      document.querySelectorAll('#hand .card').forEach(c=>c.classList.remove('selected'));
+    } else if(k==='r'){
+      const btn = document.getElementById('rerollBtn'); if(btn) btn.click();
+    } else if(k==='e'){
+      const btn = document.getElementById('endDayBtn'); if(btn) btn.click();
+    } else if(k==='c'){
+      const btn = document.getElementById('calendarBtn'); if(btn) btn.click();
+    } else if(k==='s'){
+      const btn = document.getElementById('saveBtn'); if(btn) btn.click();
+    } else if(k==='l'){
+      const btn = document.getElementById('loadBtn'); if(btn) btn.click();
+    }
+  });
+  // quick self-check
+  generateShop();
+});
+</script>
+</body>
+</html>
+
